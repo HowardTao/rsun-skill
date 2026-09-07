@@ -12,7 +12,10 @@
 
 输入 JSON 为 `guancli ds preview k3a8a2772ee4143d694a2ecd --filter ... -f json` 的输出
 （行记录数组，一行一合同）。
-两模式输出规格一致：单 sheet 纯明细临时表，输出列统一 14 列（OUTPUT_COLS），
+两模式输出规格一致：单 sheet 纯明细临时表，输出列统一 26 列（OUTPUT_COLS）：
+14 基础列 + 6 费用列（数据集现成字段）+ 6 计算列（日单价，元/㎡/天，
+日单价 = 总应收/(到期日-起租日+1)/计租面积；日净单价 = 优惠后总应收/同口径；
+计租面积或日期缺失/无效、天数为非正数时留空），
 无汇总页；作为后续收入/回款预测的中间基表，最终输出表另行提供。
 口径:
 - 在执行(active) = 起租日 <= 基准日 <= 到期日(日期窗口判定),含正铺+多经;合同状态仅展示。
@@ -31,13 +34,32 @@ from openpyxl.utils import get_column_letter
 OUTPUT_COLS = [
     "门店名称", "合同号", "铺位号", "租户名称", "品牌", "业态", "主品类",
     "楼层", "计租方式", "计租面积", "起租日", "到期日", "铺位类型", "合同状态",
+    "租金总应收", "优惠后租金总应收", "物业费总应收", "优惠后物业费总应收",
+    "营销推广费总应收", "优惠后营销推广费总应收",
+    "租金日单价", "租金日净单价", "物业费日单价", "物业费日净单价",
+    "营销推广费日单价", "营销推广费日净单价",
 ]
-NUM_COLS = {"计租面积"}
+# 计算列 = (总应收列, 优惠后总应收列, 日单价列, 日净单价列)
+PRICE_PAIRS = [
+    ("租金总应收", "优惠后租金总应收", "租金日单价", "租金日净单价"),
+    ("物业费总应收", "优惠后物业费总应收", "物业费日单价", "物业费日净单价"),
+    ("营销推广费总应收", "优惠后营销推广费总应收", "营销推广费日单价", "营销推广费日净单价"),
+]
+NUM_COLS = {
+    "计租面积", "租金总应收", "优惠后租金总应收", "物业费总应收",
+    "优惠后物业费总应收", "营销推广费总应收", "优惠后营销推广费总应收",
+    "租金日单价", "租金日净单价", "物业费日单价", "物业费日净单价",
+    "营销推广费日单价", "营销推广费日净单价",
+}
 DATE_COLS = {"起租日", "到期日"}
 WIDTHS = {
     "门店名称": 18, "合同号": 15, "铺位号": 13, "租户名称": 26, "品牌": 16,
     "业态": 10, "主品类": 12, "楼层": 8, "计租方式": 10, "计租面积": 11,
     "起租日": 12, "到期日": 12, "铺位类型": 10, "合同状态": 10,
+    "租金总应收": 13, "优惠后租金总应收": 14, "物业费总应收": 13,
+    "优惠后物业费总应收": 14, "营销推广费总应收": 14, "优惠后营销推广费总应收": 15,
+    "租金日单价": 11, "租金日净单价": 12, "物业费日单价": 11, "物业费日净单价": 12,
+    "营销推广费日单价": 13, "营销推广费日净单价": 14,
 }
 MODE_META = {
     "active": {"sheet": "在执行合同", "scope": "起租日≤基准日≤到期日（日期窗口判定）"},
@@ -68,6 +90,27 @@ def clean(v, col):
     return v
 
 
+def calc_unit_prices(rows):
+    """就地计算 6 个日单价列（元/㎡/天）：
+    日单价 = 总应收/(到期日-起租日+1)/计租面积；日净单价 = 优惠后总应收/同口径。
+    计租面积缺失/为0、日期缺失/无效、天数为非正数时留空（None）。
+    """
+    for r in rows:
+        s, e = str(r.get("起租日") or "")[:10], str(r.get("到期日") or "")[:10]
+        area = num(r.get("计租面积"))
+        days = None
+        try:
+            if s and e:
+                days = (date.fromisoformat(e) - date.fromisoformat(s)).days + 1
+        except ValueError:
+            days = None
+        denom = area * days if (area and days and days > 0) else None
+        for gross, net, out_g, out_n in PRICE_PAIRS:
+            g, n = num(r.get(gross)), num(r.get(net))
+            r[out_g] = round(g / denom, 6) if (g is not None and denom) else None
+            r[out_n] = round(n / denom, 6) if (n is not None and denom) else None
+
+
 def render_detail_sheet(ws, data, cols):
     """渲染明细 sheet：第 1 行表头、第 2 行起数据；冻结首行并加自动筛选。"""
     ws.freeze_panes = "A2"
@@ -96,6 +139,7 @@ def build(input_path, base_date_str, store, output, snapshot_time, pos_note, mod
         sys.exit("输入 JSON 不是行记录数组，请确认是 guancli ds preview -f json 的输出")
 
     meta = MODE_META[mode]
+    calc_unit_prices(data)
 
     # 模式 B 附加口径：只保留 起租日 < 到期日 的记录（guancli filter 不支持字段间比较，本地过滤）
     dropped = []

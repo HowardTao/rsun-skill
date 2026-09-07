@@ -18,7 +18,8 @@
 - 其余合同: 是否续签=否, 续签描述为空
 - 同铺位多份合同时按起租日升序列出全部合同号（顿号分隔）；铺位号为空不参与匹配。
 
-输出为单 sheet 纯明细临时表：16 列 = 14 列基础列 + 是否续签/续签描述，
+输出为单 sheet 纯明细临时表：28 列 = 26 列基础列（含租金/物业费/营销推广费
+总应收及优惠后总应收 + 各自的日单价/日净单价计算列，元/㎡/天）+ 是否续签/续签描述，
 按铺位号、起租日、合同号排序（同铺位下在执行合同起租日必然早于未执行合同，
 续签合同对自然相邻），作为后续收入和回款预测的基础表（临时文件，最终输出表另行提供）。
 """
@@ -33,7 +34,7 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from make_report import OUTPUT_COLS, render_detail_sheet  # noqa: E402
+from make_report import OUTPUT_COLS, calc_unit_prices, render_detail_sheet  # noqa: E402
 
 MERGED_COLS = OUTPUT_COLS + ["是否续签", "续签描述"]
 SHEET_NAME = "执行+未执行合同清单"
@@ -88,6 +89,8 @@ def build(active_path, future_path, base_date_str, store, output, snapshot_time)
             ok = False
         (kept if ok else dropped).append(r)
     future = kept
+    calc_unit_prices(active)
+    calc_unit_prices(future)
     if dropped:
         print(f"已过滤: 剔除{len(dropped)}行不满足 起租日<到期日（含起租日/到期日缺失或无效）的记录")
         for r in dropped[:10]:
