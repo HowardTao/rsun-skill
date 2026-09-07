@@ -1,0 +1,8 @@
+# Python 字节码缓存目录（仓库内任意层级）
+__pycache__/
+
+# Python 编译字节码文件
+*.pyc
+
+# 输出目录
+output/
