@@ -18,8 +18,10 @@
   一行一条账单费用区间明细；费用类型四类（租金/物业费/营销推广费/其他费用）
   全部纳入，按合同号与清单关联，仅保留清单内合同的行。
 
-输出 1（--output-detail）应收明细临时表，单 sheet 纯明细 19 列:
-- 合同标识 4 列: 门店名称/合同号/铺位号/租户名称
+输出 1（--output-detail）应收明细临时表，单 sheet 纯明细 31 列:
+- 合同标识 + 合同属性 16 列: 门店名称/合同号/铺位号/租户名称 + 区域/楼栋/品牌/业态/
+  主品类/楼层/计租面积/起租日/到期日/铺位类型/合同状态/是否续签
+  （12 个合同属性列均按合同号取自合并清单；区域/楼栋来自台账字段、随清单输入）
 - 账单标识 2 列: 应收编号/账单主键
 - 费项 3 列: 费用名/费用类型/税率
 - 时间周期 3 列: 费用开始日/费用截止日/应收日
@@ -28,9 +30,9 @@
   不含税优惠后应收金额 = 优惠后应收金额/(1+税率)；税率缺失时留空；保留 2 位小数。
 按 合同号/费用类型/费用开始日/费用名/应收编号 排序。
 
-输出 2（--output-merged）合并清单升级版，单 sheet 纯明细 32 列 =
-merge_contracts.py 的 28 列（含续签标记）+ 最后账期费用开始日 + 最后账期费用截止日
-+ 支付周期 + 提前收款天数:
+输出 2（--output-merged）合并清单升级版，单 sheet 纯明细 34 列 =
+merge_contracts.py 的 30 列（含区域、楼栋、续签标记）+ 最后账期费用开始日
++ 最后账期费用截止日 + 支付周期 + 提前收款天数:
 - 最后账期口径（2026-09-07 用户确认）: 费用类型=租金 的账单中
   费用截止日最晚的一期（截止日相同时取费用开始日更晚，再同取应收日更晚）。
 - 最后账期费用开始日/最后账期费用截止日 = 该期账单的费用开始日/费用截止日。
@@ -58,13 +60,19 @@ from merge_contracts import (  # noqa: E402
 )
 
 DETAIL_SHEET = "合同全周期应收明细"
+# 合同属性列（2026-09-08 新增 12 列：区域/楼栋取自台账映射，其余取自合并清单，按合同号关联）
+ATTR_COLS = ["区域", "楼栋", "品牌", "业态", "主品类", "楼层", "计租面积",
+             "起租日", "到期日", "铺位类型", "合同状态", "是否续签"]
 DETAIL_COLS = [
-    "门店名称", "合同号", "铺位号", "租户名称", "应收编号", "账单主键",
+    "门店名称", "合同号", "铺位号", "租户名称",
+] + ATTR_COLS + [
+    "应收编号", "账单主键",
     "费用名", "费用类型", "税率", "费用开始日", "费用截止日", "应收日",
     "应收金额", "优惠金额", "优惠后应收金额", "已收金额", "未收金额",
     "不含税应收金额", "不含税优惠后应收金额",
 ]
-MERGED32_COLS = MERGED_COLS + [
+# 合并清单收款周期升级版列（原 MERGED32_COLS，2026-09-08 新增区域/楼栋列后为 34 列）
+MERGED_PAY_COLS = MERGED_COLS + [
     "最后账期费用开始日", "最后账期费用截止日", "支付周期", "提前收款天数",
 ]
 
@@ -87,6 +95,8 @@ WIDTHS = {
     "优惠后应收金额": 14, "已收金额": 13, "未收金额": 12, "不含税应收金额": 14,
     "不含税优惠后应收金额": 16, "支付周期": 10, "提前收款天数": 12,
     "最后账期费用开始日": 14, "最后账期费用截止日": 14,
+    "区域": 12, "楼栋": 10, "品牌": 16, "业态": 10, "主品类": 12, "楼层": 8,
+    "计租面积": 11, "起租日": 12, "到期日": 12, "铺位类型": 10, "合同状态": 10,
 }
 
 H_FONT = Font(name="PingFang SC", size=11, bold=True, color="FFFFFF")
@@ -217,6 +227,17 @@ def build(active_path, future_path, receivable_glob, base_date_str, store,
 
     receivable, paths = load_receivable(receivable_glob, valid_ids)
     calc_ex_tax(receivable)
+
+    # 按合同号把 12 个合同属性列（区域/楼栋/品牌/.../是否续签）填充到应收明细行
+    attr_by_cid = {}
+    for row in merged_rows:
+        cid = str(row.get("合同号") or "").strip()
+        if cid:
+            attr_by_cid[cid] = {col: row.get(col) for col in ATTR_COLS}
+    for r in receivable:
+        cid = str(r.get("合同号") or "").strip()
+        r.update(attr_by_cid.get(cid, {}))
+
     receivable.sort(key=lambda r: (
         str(r.get("合同号") or ""), str(r.get("费用类型") or ""),
         str(r.get("费用开始日") or "")[:10], str(r.get("费用名") or ""),
@@ -232,7 +253,7 @@ def build(active_path, future_path, receivable_glob, base_date_str, store,
     render_sheet(ws, receivable, DETAIL_COLS)
     wb.save(output_detail)
 
-    # --- 输出 2：合并清单 32 列（+最后账期起止日/支付周期/提前收款天数）---
+    # --- 输出 2：合并清单 34 列（+最后账期起止日/支付周期/提前收款天数）---
     pay = calc_pay_period(receivable)
     no_rent = sorted(cid for cid in valid_ids if cid not in pay)
     for row in merged_rows:
@@ -245,7 +266,7 @@ def build(active_path, future_path, receivable_glob, base_date_str, store,
     wb2 = Workbook()
     ws2 = wb2.active
     ws2.title = "执行+未执行合同清单"
-    render_sheet(ws2, merged_rows, MERGED32_COLS)
+    render_sheet(ws2, merged_rows, MERGED_PAY_COLS)
     wb2.save(output_merged)
 
     # --- 校验与摘要 ---
@@ -258,7 +279,7 @@ def build(active_path, future_path, receivable_glob, base_date_str, store,
     if no_detail:
         print(f"清单中无应收明细的合同{len(no_detail)}份: {', '.join(no_detail[:10])}"
               + ("..." if len(no_detail) > 10 else ""))
-    print(f"合并清单: {len(merged_rows)}行(32列) = 在执行{len(active)} + "
+    print(f"合并清单: {len(merged_rows)}行(34列) = 在执行{len(active)} + "
           f"未执行{len(future) - len(dropped)}, 续签: 在执行侧{renewed_act}份 / "
           f"未执行侧{renewed_fut}份")
     if no_rent:
@@ -294,7 +315,7 @@ def main():
     ap.add_argument("--base-date", required=True, help="基准日 YYYY-MM-DD")
     ap.add_argument("--store", required=True, help="门店全称（用于摘要打印）")
     ap.add_argument("--output-detail", required=True, help="应收明细临时表 xlsx 输出路径")
-    ap.add_argument("--output-merged", required=True, help="合并清单（30 列）xlsx 输出路径")
+    ap.add_argument("--output-merged", required=True, help="合并清单（34 列）xlsx 输出路径")
     ap.add_argument("--snapshot-time", default="", help="数据集快照更新时间（可选）")
     args = ap.parse_args()
     build(args.active, args.future, args.receivable, args.base_date, args.store,

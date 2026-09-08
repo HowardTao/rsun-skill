@@ -23,7 +23,9 @@
   费用名 = 费用类型同名（租金/物业费/营销推广费）。
 - 跳过并汇报: 支付周期或提前收款天数缺失的合同、三费项日单价全缺的合同、到期日缺失的合同。
 
-输出: 单 sheet「续签合同应收明细」纯明细临时表，19 列与合同全周期应收明细格式完全一致，
+输出: 单 sheet「续签合同应收明细」纯明细临时表，31 列与合同全周期应收明细格式完全一致
+（含 12 个合同属性列：区域/楼栋/品牌/业态/主品类/楼层/计租面积/起租日/到期日/铺位类型/
+合同状态/是否续签，按合同号取自合并清单；起租日/到期日/合同状态为原合同值），
 按 合同号/费用类型/费用开始日/账单主键 排序；首行冻结 + 自动筛选；非最终输出表。
 """
 import argparse
@@ -35,7 +37,7 @@ from openpyxl import Workbook, load_workbook
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
 from make_report import num  # noqa: E402
-from receivable_detail import DETAIL_COLS, render_sheet  # noqa: E402
+from receivable_detail import ATTR_COLS, DETAIL_COLS, render_sheet  # noqa: E402
 
 SHEET_NAME = "续签合同应收明细"
 # 固定费项税率（2026-09-08 用户指定）: 租金 9%、物业费 6%、营销推广费 6%
@@ -120,6 +122,7 @@ def build(merged_path, forecast_year, base_date_str, store, output, snapshot_tim
                 break
             if recv >= year_start:
                 days = (e - s).days + 1
+                attrs = {col: r.get(col) for col in ATTR_COLS}
                 for ftype, price_day, net_day, tax_rate in fees:
                     seq_by_cid[cid] += 1
                     gross = round(price_day * area * days, 2)
@@ -127,6 +130,7 @@ def build(merged_path, forecast_year, base_date_str, store, output, snapshot_tim
                     rows.append({
                         "门店名称": r.get("门店名称"), "合同号": cid,
                         "铺位号": r.get("铺位号"), "租户名称": r.get("租户名称"),
+                        **attrs,
                         "应收编号": None,
                         "账单主键": f"XC-{cid}-{seq_by_cid[cid]:04d}",
                         "费用名": ftype, "费用类型": ftype, "税率": tax_rate,
@@ -184,7 +188,7 @@ def build(merged_path, forecast_year, base_date_str, store, output, snapshot_tim
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--merged", required=True, help="32 列合并清单 xlsx（output/ 下）")
+    ap.add_argument("--merged", required=True, help="34 列合并清单 xlsx（output/ 下）")
     ap.add_argument("--forecast-year", required=True, help="预测年度 YYYY（必填，D14）")
     ap.add_argument("--base-date", required=True, help="基准日 YYYY-MM-DD")
     ap.add_argument("--store", required=True, help="门店全称（用于摘要打印）")

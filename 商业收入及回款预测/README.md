@@ -6,9 +6,9 @@
 
 | 临时表 | 说明 | 列数 |
 |---|---|---|
-| 在执行合同临时表 | 起租日 ≤ 基准日 ≤ 到期日 的存量合同（模式 A） | 26 |
-| 未执行合同临时表 | 起租日 > 基准日 且 起租日 < 到期日 的已签约未起租合同（模式 B） | 26 |
-| 执行+未执行合同清单 | 两表按（门店, 铺位号）匹配续签关系后合并，并附加收款周期信息 | 32 |
+| 在执行合同临时表 | 起租日 ≤ 基准日 ≤ 到期日 的存量合同（模式 A） | 28 |
+| 未执行合同临时表 | 起租日 > 基准日 且 起租日 < 到期日 的已签约未起租合同（模式 B） | 28 |
+| 执行+未执行合同清单 | 两表按（门店, 铺位号）匹配续签关系后合并，并附加收款周期信息 | 34 |
 | 合同全周期应收明细 | 按合同号关联应收账单明细（含不含税金额计算） | 19 |
 | 续签合同应收明细 | 预测年度内到期未续签合同假定续签，滚动生成应收预测 | 19 |
 
@@ -30,8 +30,8 @@
 │   └── dataset-and-rules.md   # 数据集字段、口径验证记录、门店别名映射
 ├── scripts/
 │   ├── make_report.py         # 在执行/未执行合同临时表生成器（--mode active/future）
-│   ├── merge_contracts.py     # 执行+未执行合同清单合并器（续签标记，28 列基础表）
-│   ├── receivable_detail.py   # 应收明细临时表生成 + 合并清单收款周期升级（32 列）
+│   ├── merge_contracts.py     # 执行+未执行合同清单合并器（续签标记，30 列基础表）
+│   ├── receivable_detail.py   # 应收明细临时表生成 + 合并清单收款周期升级（34 列）
 │   └── renewal_receivable.py  # 续签合同应收明细生成器（假定续签滚动预测）
 └── output/                    # 中间临时表 xlsx 输出目录（不入库）
 ```
@@ -107,7 +107,7 @@ AI 会按 `SKILL.md` 的流程执行：确认基准日 → 确认预估年度（
 PY=~/.workbuddy/binaries/python/envs/default/bin/python
 SKILL=<技能目录>
 
-# 1. 在执行 / 未执行合同临时表（26 列）
+# 1. 在执行 / 未执行合同临时表（28 列）
 $PY $SKILL/scripts/make_report.py \
   --mode active \
   --input /tmp/active_contracts_<基准日>.json \
@@ -115,7 +115,7 @@ $PY $SKILL/scripts/make_report.py \
   --output $SKILL/output/<门店简称>在执行合同_<基准日>.xlsx \
   --snapshot-time "<数据集更新时间>"
 
-# 2. 合并清单（28 列，含续签标记）
+# 2. 合并清单（30 列，含续签标记）
 $PY $SKILL/scripts/merge_contracts.py \
   --active /tmp/active_contracts_<基准日>.json \
   --future /tmp/future_contracts_<基准日>.json \
@@ -123,7 +123,7 @@ $PY $SKILL/scripts/merge_contracts.py \
   --output $SKILL/output/执行+未执行合同清单_<基准日>.xlsx \
   --snapshot-time "<数据集更新时间>"
 
-# 3. 应收明细临时表（19 列）+ 合并清单升级（32 列，含最后账期/支付周期/提前收款天数）
+# 3. 应收明细临时表（19 列）+ 合并清单升级（34 列，含最后账期/支付周期/提前收款天数）
 $PY $SKILL/scripts/receivable_detail.py \
   --active /tmp/active_contracts_<基准日>.json \
   --future /tmp/future_contracts_<基准日>.json \
