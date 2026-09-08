@@ -3,12 +3,12 @@
 
 用法:
     # 在执行合同临时表（起租日 ≤ 基准日 ≤ 到期日）
-    python make_report.py --mode active --input <guancli导出的JSON> --base-date 2026-08-31 \
-        --store 弘阳家居南京江北店 --output <输出.xlsx> [--snapshot-time "..."]
+    python make_report.py --mode active --input <guancli导出的JSON> --base-date <基准日YYYY-MM-DD> \
+        --store <门店全称> --output <输出.xlsx> [--snapshot-time "..."]
 
     # 未执行合同临时表（起租日 > 基准日，收入/回款预测输入）
-    python make_report.py --mode future --input <guancli导出的JSON> --base-date 2026-09-07 \
-        --store 弘阳家居南京江北店 --output <输出.xlsx> [--snapshot-time "..."]
+    python make_report.py --mode future --input <guancli导出的JSON> --base-date <基准日YYYY-MM-DD> \
+        --store <门店全称> --output <输出.xlsx> [--snapshot-time "..."]
 
 输入 JSON 为 `guancli ds preview k3a8a2772ee4143d694a2ecd --filter ... -f json` 的输出
 （行记录数组，一行一合同）。

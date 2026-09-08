@@ -4,7 +4,7 @@
 用法:
     python merge_contracts.py --active /tmp/active_contracts_<基准日>.json \
         --future /tmp/future_contracts_<基准日>.json \
-        --base-date 2026-09-07 --store 弘阳家居南京江北店 \
+        --base-date <基准日YYYY-MM-DD> --store <门店全称> \
         --output <输出目录>/执行+未执行合同清单_<基准日>.xlsx [--snapshot-time "..."]
 
 输入为两个 guancli ds preview -f json 输出（与 make_report.py 同源）：
@@ -71,14 +71,13 @@ def sort_key(row):
     )
 
 
-def build(active_path, future_path, base_date_str, store, output, snapshot_time):
-    active = load_json(active_path, "在执行合同")
-    future = load_json(future_path, "未执行合同")
-    try:
-        date.fromisoformat(base_date_str)
-    except ValueError:
-        sys.exit(f"基准日无效: {base_date_str}，需要 YYYY-MM-DD 格式的真实日历日期")
+def build_merged_rows(active, future):
+    """由在执行/未执行合同行构建合并清单行（含续签标记）。
 
+    输入的 future 为原始行（未过滤）；本函数内部应用 起租日<到期日 过滤并计算日单价。
+    返回 (rows, renewed_act, renewed_fut, dropped)：rows 为含 是否续签/续签描述 的
+    28 列字典行列表（已按 铺位号/起租日/合同号 排序）；dropped 为被剔除的 future 行。
+    """
     # 模式 B 附加口径：起租日 < 到期日（与 make_report.py --mode future 一致，本地过滤）
     kept, dropped = [], []
     for r in future:
@@ -91,11 +90,6 @@ def build(active_path, future_path, base_date_str, store, output, snapshot_time)
     future = kept
     calc_unit_prices(active)
     calc_unit_prices(future)
-    if dropped:
-        print(f"已过滤: 剔除{len(dropped)}行不满足 起租日<到期日（含起租日/到期日缺失或无效）的记录")
-        for r in dropped[:10]:
-            print(f"  - 合同号 {r.get('合同号')}, 起租日 {str(r.get('起租日') or '')[:10]}, "
-                  f"到期日 {str(r.get('到期日') or '')[:10]}")
 
     act_by_pos = defaultdict(list)
     for r in active:
@@ -134,6 +128,23 @@ def build(active_path, future_path, base_date_str, store, output, snapshot_time)
         rows.append(row)
 
     rows.sort(key=sort_key)
+    return rows, renewed_act, renewed_fut, dropped
+
+
+def build(active_path, future_path, base_date_str, store, output, snapshot_time):
+    active = load_json(active_path, "在执行合同")
+    future = load_json(future_path, "未执行合同")
+    try:
+        date.fromisoformat(base_date_str)
+    except ValueError:
+        sys.exit(f"基准日无效: {base_date_str}，需要 YYYY-MM-DD 格式的真实日历日期")
+
+    rows, renewed_act, renewed_fut, dropped = build_merged_rows(active, future)
+    if dropped:
+        print(f"已过滤: 剔除{len(dropped)}行不满足 起租日<到期日（含起租日/到期日缺失或无效）的记录")
+        for r in dropped[:10]:
+            print(f"  - 合同号 {r.get('合同号')}, 起租日 {str(r.get('起租日') or '')[:10]}, "
+                  f"到期日 {str(r.get('到期日') or '')[:10]}")
 
     wb = Workbook()
     ws = wb.active
