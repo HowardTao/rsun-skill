@@ -147,7 +147,7 @@ $PY $SKILL/scripts/renewal_receivable.py \
 
 - 一律用 `guancli ds preview --filter`，不用 `ds execute-sql`（该环境报 Spark `PARSE_SYNTAX_ERROR`）；
 - 日期过滤条件的时间部分必须写 `00:00:00`（字段为零点时间戳）；
-- 合同清单取数 `--limit 2000`、应收明细按合同号 `IN` 每 50 个一批 `--limit 10000`；行数达到 limit 时需分批处理；
+- 合同清单取数 `--limit 2000`；**应收明细取数强制批次查询**：按合同号 `IN` 每 50 个一批（`--limit 10000 -f json`，落盘 `/tmp/receivable_batches_<基准日>/`），无论合同号多少一律分批、禁止一次性全量取数；单批行数达到 limit 视为截断，须拆小批次重取；全部批次取完并核对后方可生成临时表；
 - 所有中间临时表 xlsx 统一输出到**用户当前工作目录**的 `output/`（不写入技能安装目录），命名 `<门店简称><表名>_<基准日>.xlsx`。
 
 各脚本的参数与口径详见脚本头部注释及 `SKILL.md`。
