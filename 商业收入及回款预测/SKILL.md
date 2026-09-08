@@ -92,7 +92,7 @@ guancli ds preview k3a8a2772ee4143d694a2ecd \
   --mode active \
   --input /tmp/active_contracts_<基准日>.json \
   --base-date <基准日> --store <门店全称> \
-  --output <skill目录>/output/<门店简称>在执行合同_<基准日>.xlsx \
+  --output <工作目录>/output/<门店简称>在执行合同_<基准日>.xlsx \
   --snapshot-time "<ds get --brief 查到的更新时间>"
 ```
 
@@ -125,7 +125,7 @@ guancli ds preview k3a8a2772ee4143d694a2ecd \
   --mode future \
   --input /tmp/future_contracts_<基准日>.json \
   --base-date <基准日> --store <门店全称> \
-  --output <skill目录>/output/<门店简称>未执行合同_<基准日>.xlsx \
+  --output <工作目录>/output/<门店简称>未执行合同_<基准日>.xlsx \
   --snapshot-time "<ds get --brief 查到的更新时间>"
 ```
 
@@ -155,13 +155,13 @@ guancli ds preview k3a8a2772ee4143d694a2ecd \
   --active /tmp/active_contracts_<基准日>.json \
   --future /tmp/future_contracts_<基准日>.json \
   --base-date <基准日> --store <门店全称> \
-  --output <skill目录>/output/执行+未执行合同清单_<基准日>.xlsx \
+  --output <工作目录>/output/执行+未执行合同清单_<基准日>.xlsx \
   --snapshot-time "<ds get --brief 查到的更新时间>"
 ```
 
 输出为单 sheet「执行+未执行合同清单」：30 列 = 28 列基础列（含区域、楼栋、6 个费用列与 6 个日单价计算列）+ `是否续签` + `续签描述`。按铺位号、起租日、合同号排序（同铺位下在执行合同起租日必然早于未执行合同，续签合同对自然相邻便于核对）。该清单为**临时文件**，是后续收入和回款预测的基础表（后续关联的应收明细均为存量收入，无需区分合同来源列）；最终输出表后续另行提供。生成后用 present_files 交付。
 
-> **输出路径约定**：所有中间临时表 xlsx（在执行/未执行合同、合并清单、应收明细）一律输出到 `<skill目录>/output/` 文件夹，命名 `<门店简称><表名>_<基准日>.xlsx`；它们均不是最终报告，最终输出表后续另行提供。
+> **输出路径约定**：所有中间临时表 xlsx（在执行/未执行合同、合并清单、应收明细、续签明细）一律输出到**用户当前工作目录**（即 AI 执行命令时所在的项目目录，**不是技能安装目录**）下的 `output/` 文件夹，命名 `<门店简称><表名>_<基准日>.xlsx`；**禁止写入技能安装目录**——技能可能安装在 `~/.workbuddy/skills/` 等位置，运行产物应留在用户自己的工作区。它们均不是最终报告，最终输出表后续另行提供。
 
 ### 校验与汇报
 
@@ -199,8 +199,8 @@ done
   --future /tmp/future_contracts_<基准日>.json \
   --receivable "/tmp/receivable_batches_<基准日>/b_*.json" \
   --base-date <基准日> --store <门店全称> \
-  --output-detail <skill目录>/output/<门店简称>合同全周期应收明细_<基准日>.xlsx \
-  --output-merged <skill目录>/output/执行+未执行合同清单_<基准日>.xlsx \
+  --output-detail <工作目录>/output/<门店简称>合同全周期应收明细_<基准日>.xlsx \
+  --output-merged <工作目录>/output/执行+未执行合同清单_<基准日>.xlsx \
   --snapshot-time "<ds get --brief 查到的更新时间>"
 ```
 
@@ -238,9 +238,9 @@ done
 
 ```bash
 ~/.workbuddy/binaries/python/envs/default/bin/python <skill目录>/scripts/renewal_receivable.py \
-  --merged <skill目录>/output/执行+未执行合同清单_<基准日>.xlsx \
+  --merged <工作目录>/output/执行+未执行合同清单_<基准日>.xlsx \
   --forecast-year <预测年度> --base-date <基准日> --store <门店全称> \
-  --output <skill目录>/output/<门店简称>续签合同应收明细_<预测年度>年_<基准日>.xlsx \
+  --output <工作目录>/output/<门店简称>续签合同应收明细_<预测年度>年_<基准日>.xlsx \
   --snapshot-time "<ds get --brief 查到的更新时间>"
 ```
 

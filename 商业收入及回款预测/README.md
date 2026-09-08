@@ -33,8 +33,9 @@
 │   ├── merge_contracts.py     # 执行+未执行合同清单合并器（续签标记，30 列基础表）
 │   ├── receivable_detail.py   # 应收明细临时表生成 + 合并清单收款周期升级（34 列）
 │   └── renewal_receivable.py  # 续签合同应收明细生成器（假定续签滚动预测）
-└── output/                    # 中间临时表 xlsx 输出目录（不入库）
 ```
+
+> 运行产物（中间临时表 xlsx）输出到**用户当前工作目录**的 `output/` 文件夹，不在技能目录内（见「使用说明」）。
 
 ## 环境要求
 
@@ -90,7 +91,7 @@ pip install openpyxl
 > 帮我生成弘阳家居南京江北店基准日 2026-08-31 的在执行合同临时表
 > 生成江北店 2026 年收入回款预测的基础表
 
-AI 会按 `SKILL.md` 的流程执行：确认基准日 → 确认预估年度（收入/回款预测必问）→ 确认门店与铺位类型 → guancli 取数 → 校验 → 生成 Excel 到 `output/`。
+AI 会按 `SKILL.md` 的流程执行：确认基准日 → 确认预估年度（收入/回款预测必问）→ 确认门店与铺位类型 → guancli 取数 → 校验 → 生成 Excel 到你**当前工作目录**的 `output/` 文件夹（不写入技能安装目录）。
 
 **交互约定（红线）**：
 
@@ -106,13 +107,14 @@ AI 会按 `SKILL.md` 的流程执行：确认基准日 → 确认预估年度（
 ```bash
 PY=~/.workbuddy/binaries/python/envs/default/bin/python
 SKILL=<技能目录>
+WORKDIR=<你的工作目录>       # 中间临时表统一输出到 $WORKDIR/output/（不写入技能目录）
 
 # 1. 在执行 / 未执行合同临时表（28 列）
 $PY $SKILL/scripts/make_report.py \
   --mode active \
   --input /tmp/active_contracts_<基准日>.json \
   --base-date <基准日> --store <门店全称> \
-  --output $SKILL/output/<门店简称>在执行合同_<基准日>.xlsx \
+  --output $WORKDIR/output/<门店简称>在执行合同_<基准日>.xlsx \
   --snapshot-time "<数据集更新时间>"
 
 # 2. 合并清单（30 列，含续签标记）
@@ -120,7 +122,7 @@ $PY $SKILL/scripts/merge_contracts.py \
   --active /tmp/active_contracts_<基准日>.json \
   --future /tmp/future_contracts_<基准日>.json \
   --base-date <基准日> --store <门店全称> \
-  --output $SKILL/output/执行+未执行合同清单_<基准日>.xlsx \
+  --output $WORKDIR/output/执行+未执行合同清单_<基准日>.xlsx \
   --snapshot-time "<数据集更新时间>"
 
 # 3. 应收明细临时表（19 列）+ 合并清单升级（34 列，含最后账期/支付周期/提前收款天数）
@@ -129,15 +131,15 @@ $PY $SKILL/scripts/receivable_detail.py \
   --future /tmp/future_contracts_<基准日>.json \
   --receivable "/tmp/receivable_batches_<基准日>/b_*.json" \
   --base-date <基准日> --store <门店全称> \
-  --output-detail $SKILL/output/<门店简称>合同全周期应收明细_<基准日>.xlsx \
-  --output-merged $SKILL/output/执行+未执行合同清单_<基准日>.xlsx \
+  --output-detail $WORKDIR/output/<门店简称>合同全周期应收明细_<基准日>.xlsx \
+  --output-merged $WORKDIR/output/执行+未执行合同清单_<基准日>.xlsx \
   --snapshot-time "<数据集更新时间>"
 
 # 4. 续签合同应收明细（19 列，假定续签滚动预测）
 $PY $SKILL/scripts/renewal_receivable.py \
-  --merged $SKILL/output/执行+未执行合同清单_<基准日>.xlsx \
+  --merged $WORKDIR/output/执行+未执行合同清单_<基准日>.xlsx \
   --forecast-year <预测年度> --base-date <基准日> --store <门店全称> \
-  --output $SKILL/output/<门店简称>续签合同应收明细_<预测年度>年_<基准日>.xlsx \
+  --output $WORKDIR/output/<门店简称>续签合同应收明细_<预测年度>年_<基准日>.xlsx \
   --snapshot-time "<数据集更新时间>"
 ```
 
@@ -146,7 +148,7 @@ $PY $SKILL/scripts/renewal_receivable.py \
 - 一律用 `guancli ds preview --filter`，不用 `ds execute-sql`（该环境报 Spark `PARSE_SYNTAX_ERROR`）；
 - 日期过滤条件的时间部分必须写 `00:00:00`（字段为零点时间戳）；
 - 合同清单取数 `--limit 2000`、应收明细按合同号 `IN` 每 50 个一批 `--limit 10000`；行数达到 limit 时需分批处理；
-- 所有中间临时表 xlsx 统一输出到技能目录 `output/`，命名 `<门店简称><表名>_<基准日>.xlsx`。
+- 所有中间临时表 xlsx 统一输出到**用户当前工作目录**的 `output/`（不写入技能安装目录），命名 `<门店简称><表名>_<基准日>.xlsx`。
 
 各脚本的参数与口径详见脚本头部注释及 `SKILL.md`。
 

@@ -3,9 +3,9 @@
 
 用法:
     python renewal_receivable.py \
-        --merged <skill目录>/output/执行+未执行合同清单_<基准日>.xlsx \
+        --merged <工作目录>/output/执行+未执行合同清单_<基准日>.xlsx \
         --forecast-year <预测年度YYYY> --base-date <基准日YYYY-MM-DD> --store <门店全称> \
-        --output <skill目录>/output/<门店简称>续签合同应收明细_<预测年度>年_<基准日>.xlsx \
+        --output <工作目录>/output/<门店简称>续签合同应收明细_<预测年度>年_<基准日>.xlsx \
         [--snapshot-time "..."]
 
 口径（2026-09-08 用户确认）:
