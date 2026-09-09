@@ -9,12 +9,12 @@
 | 在执行合同临时表 | 起租日 ≤ 基准日 ≤ 到期日 的存量合同（模式 A） | 28 |
 | 未执行合同临时表 | 起租日 > 基准日 且 起租日 < 到期日 的已签约未起租合同（模式 B） | 28 |
 | 执行+未执行合同清单 | 两表按（门店, 铺位号）匹配续签关系后合并，并附加收款周期信息 | 34 |
-| 合同全周期应收明细 | 按合同号关联应收账单明细（含不含税金额计算） | 19 |
-| 续签合同应收明细 | 预测年度内到期未续签合同假定续签，滚动生成应收预测 | 19 |
+| 合同全周期应收明细 | 按合同号关联应收账单明细（含 12 个合同属性列与不含税金额计算） | 31 |
+| 续签合同应收明细 | 预测年度内到期未续签合同假定续签，滚动生成应收预测 | 31 |
 
 **数据源**（观远 BI，每日约 02:00 更新快照）：
 
-- `ADS-租费分析-租赁合同台账明细`（dsId `k3a8a272ee4143d694a2ecd`）——合同清单主表，一行一合同；
+- `ADS-租费分析-租赁合同台账明细`（dsId `k3a8a2772ee4143d694a2ecd`）——合同清单主表，一行一合同；
 - `ADS-租费分析-合同全周期应收明细`（dsId `ud1f309f6e04d4285b7364c4`）——收入/回款预测金额主表，一行一条应收账单明细。
 
 各表均为收入/回款预测流程的**中间基础表，不是最终输出表**；完整口径、执行流程与红线约定见 `SKILL.md`，项目背景、已确认决策与变更日志见 `PROJECT_MEMORY.md`。
@@ -25,7 +25,7 @@
 商业收入及回款预测/
 ├── README.md                  # 本文件
 ├── SKILL.md                   # 技能完整执行流程与口径（权威文档）
-├── PROJECT_MEMORY.md          # 项目记忆：背景、约定、已确认决策、变更日志
+├── PROJECT_MEMORY.md          # 项目记忆（开发者维护，非运行依赖，可溯源口径）
 ├── references/
 │   └── dataset-and-rules.md   # 数据集字段、口径验证记录、门店别名映射
 ├── scripts/
@@ -40,7 +40,7 @@
 ## 环境要求
 
 - **Node.js 20+**（推荐 22+）：运行 guancli（观远 CLI 取数工具）
-- **guancli**：已认证并能访问上述两个数据集（需向观远管理员申请数据集权限）
+- **guancli**：已登录目标 BI 环境 https://rsunbi.rsun.com:9521（default profile），并能访问上述两个数据集（需向观远管理员申请数据集权限）
 - **Python 3** + **openpyxl**（脚本唯一第三方依赖）
   - CodeBuddy 环境优先使用 `~/.workbuddy/binaries/python/envs/default/bin/python`；该路径不存在时用本机 Python 3
 
@@ -125,7 +125,7 @@ $PY $SKILL/scripts/merge_contracts.py \
   --output $WORKDIR/output/执行+未执行合同清单_<基准日>.xlsx \
   --snapshot-time "<数据集更新时间>"
 
-# 3. 应收明细临时表（19 列）+ 合并清单升级（34 列，含最后账期/支付周期/提前收款天数）
+# 3. 应收明细临时表（31 列）+ 合并清单升级（34 列，含最后账期/支付周期/提前收款天数）
 $PY $SKILL/scripts/receivable_detail.py \
   --active /tmp/active_contracts_<基准日>.json \
   --future /tmp/future_contracts_<基准日>.json \
@@ -135,7 +135,7 @@ $PY $SKILL/scripts/receivable_detail.py \
   --output-merged $WORKDIR/output/执行+未执行合同清单_<基准日>.xlsx \
   --snapshot-time "<数据集更新时间>"
 
-# 4. 续签合同应收明细（19 列，假定续签滚动预测）
+# 4. 续签合同应收明细（31 列，假定续签滚动预测）
 $PY $SKILL/scripts/renewal_receivable.py \
   --merged $WORKDIR/output/执行+未执行合同清单_<基准日>.xlsx \
   --forecast-year <预测年度> --base-date <基准日> --store <门店全称> \

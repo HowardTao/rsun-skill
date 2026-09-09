@@ -23,6 +23,7 @@
 """
 import argparse
 import json
+import os
 import sys
 from collections import Counter
 from datetime import date
@@ -166,6 +167,7 @@ def build(input_path, base_date_str, store, output, snapshot_time, pos_note, mod
     ws = wb.active
     ws.title = meta["sheet"]
     render_detail_sheet(ws, data, OUTPUT_COLS)
+    os.makedirs(os.path.dirname(os.path.abspath(output)), exist_ok=True)
     wb.save(output)
 
     print(f"已保存: {output}")

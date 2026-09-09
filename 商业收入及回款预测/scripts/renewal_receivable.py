@@ -29,6 +29,7 @@
 按 合同号/费用类型/费用开始日/账单主键 排序；首行冻结 + 自动筛选；非最终输出表。
 """
 import argparse
+import os
 import sys
 from collections import defaultdict
 from datetime import date, timedelta
@@ -152,6 +153,7 @@ def build(merged_path, forecast_year, base_date_str, store, output, snapshot_tim
     ws = wb.active
     ws.title = SHEET_NAME
     render_sheet(ws, rows, DETAIL_COLS)
+    os.makedirs(os.path.dirname(os.path.abspath(output)), exist_ok=True)
     wb.save(output)
 
     # --- 校验与摘要 ---

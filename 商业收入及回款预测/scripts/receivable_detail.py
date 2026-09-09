@@ -42,6 +42,7 @@ merge_contracts.py 的 30 列（含区域、楼栋、续签标记）+ 最后账�
 """
 import argparse
 import glob as globlib
+import os
 import sys
 from collections import Counter, defaultdict
 from datetime import date
@@ -251,6 +252,7 @@ def build(active_path, future_path, receivable_glob, base_date_str, store,
     ws = wb.active
     ws.title = DETAIL_SHEET
     render_sheet(ws, receivable, DETAIL_COLS)
+    os.makedirs(os.path.dirname(os.path.abspath(output_detail)), exist_ok=True)
     wb.save(output_detail)
 
     # --- 输出 2：合并清单 34 列（+最后账期起止日/支付周期/提前收款天数）---
@@ -267,6 +269,7 @@ def build(active_path, future_path, receivable_glob, base_date_str, store,
     ws2 = wb2.active
     ws2.title = "执行+未执行合同清单"
     render_sheet(ws2, merged_rows, MERGED_PAY_COLS)
+    os.makedirs(os.path.dirname(os.path.abspath(output_merged)), exist_ok=True)
     wb2.save(output_merged)
 
     # --- 校验与摘要 ---

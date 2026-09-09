@@ -154,6 +154,7 @@ def build(active_path, future_path, base_date_str, store, output, snapshot_time)
     for j, col in enumerate(MERGED_COLS, 1):
         if col in EXTRA_WIDTHS:
             ws.column_dimensions[get_column_letter(j)].width = EXTRA_WIDTHS[col]
+    os.makedirs(os.path.dirname(os.path.abspath(output)), exist_ok=True)
     wb.save(output)
 
     print(f"已保存: {output}")
