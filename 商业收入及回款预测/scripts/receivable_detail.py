@@ -52,7 +52,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from make_report import num  # noqa: E402
+from make_report import check_store, num  # noqa: E402
 from merge_contracts import (  # noqa: E402
     EXTRA_WIDTHS,
     MERGED_COLS,
@@ -225,6 +225,8 @@ def build(active_path, future_path, receivable_glob, base_date_str, store,
                  if str(r.get("合同号") or "").strip()}
     if dropped:
         print(f"已过滤(未执行清单): 剔除{len(dropped)}行不满足 起租日<到期日 的记录")
+
+    check_store(merged_rows, store, "合并清单")
 
     receivable, paths = load_receivable(receivable_glob, valid_ids)
     calc_ex_tax(receivable)

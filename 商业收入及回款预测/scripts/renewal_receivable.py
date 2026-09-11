@@ -37,7 +37,7 @@ from datetime import date, timedelta
 from openpyxl import Workbook, load_workbook
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
-from make_report import num  # noqa: E402
+from make_report import check_store, num  # noqa: E402
 from receivable_detail import ATTR_COLS, DETAIL_COLS, render_sheet  # noqa: E402
 
 SHEET_NAME = "续签合同应收明细"
@@ -81,6 +81,7 @@ def build(merged_path, forecast_year, base_date_str, store, output, snapshot_tim
         sys.exit(f"基准日无效: {base_date_str}，需要 YYYY-MM-DD 格式的真实日历日期")
 
     merged = load_merged(merged_path)
+    check_store(merged, store, "合并清单（merged xlsx）")
     year_start, year_end = date(year, 1, 1), date(year, 12, 31)
 
     # 候选: 到期日在预测年度内 且 是否续签=否

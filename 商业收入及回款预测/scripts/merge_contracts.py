@@ -35,7 +35,7 @@ from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from make_report import OUTPUT_COLS, calc_unit_prices, render_detail_sheet  # noqa: E402
+from make_report import OUTPUT_COLS, calc_unit_prices, check_store, render_detail_sheet  # noqa: E402
 
 MERGED_COLS = OUTPUT_COLS + ["是否续签", "续签描述"]
 SHEET_NAME = "执行+未执行合同清单"
@@ -146,6 +146,8 @@ def build(active_path, future_path, base_date_str, store, output, snapshot_time)
         for r in dropped[:10]:
             print(f"  - 合同号 {r.get('合同号')}, 起租日 {str(r.get('起租日') or '')[:10]}, "
                   f"到期日 {str(r.get('到期日') or '')[:10]}")
+
+    check_store(rows, store, "合并清单")
 
     wb = Workbook()
     ws = wb.active

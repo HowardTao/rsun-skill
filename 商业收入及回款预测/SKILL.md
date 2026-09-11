@@ -26,6 +26,7 @@ agent_created: true
 - **取数**：一律用 `guancli ds preview --filter`（`ds execute-sql` 在该环境报 Spark `PARSE_SYNTAX_ERROR`，不可用）；日期过滤条件的时间部分必须写 `00:00:00`（字段为零点时间戳，LE/GE 构成闭区间）；`ds preview` 无 `-o` 参数，用 shell 重定向落盘 `/tmp/`；合同清单取数 `--limit 2000`，结果行数达到 limit 时向用户说明可能被截断并分批处理。
 - **输出与交付**：所有中间临时表 xlsx 一律输出到**用户当前工作目录**（AI 执行时所在的项目目录，非技能安装目录）的 `output/` 文件夹，命名 `<门店简称><表名>_<基准日>.xlsx`。生成后统一用 present_files 交付，并在回复中给出校验结果、关键统计、口径说明与快照时间。
 - **Python 解释器**：命令模板统一用 `~/.workbuddy/binaries/python/envs/default/bin/python`（`~` 由 shell 展开为当前用户主目录，不绑定用户名）；该路径不存在时改用本机 Python 3，并确保已安装 `openpyxl`（唯一第三方依赖）。
+- **`--store` 参数（仅用于摘要）**：`--store` **不参与数据写入**，输出列的「门店名称」一律取自数据本身。四个脚本均在生成前调用 `check_store()` 做一致性校验（定义在 `make_report.py`，其余三个脚本 import 复用），`--store` 与数据实际门店不一致时打印 ⚠️ 警告（**不中断执行**），防止用 A 店取数却传 `--store B` 时摘要错标、而 Excel 内容正确却无人察觉。
 
 ### 输出列结构（模式 A/B 统一 28 列）
 
@@ -36,16 +37,8 @@ agent_created: true
 ### 第 0 步：环境前置检查（guancli，每次使用本 skill 先执行）
 
 1. 检查 guancli 是否已安装：执行 `guancli version`（或 `which guancli`）。
-2. **未安装**：参考官方文档 https://www.guandata.com/guandata-cli-installation-guide.md 安装（要求 Node.js 20+，推荐 22+）：
-
-   ```bash
-   npm install -g --foreground-scripts @guandata/guanskill
-   guanskill install-skill
-   ```
-
-   安装后执行 `guancli auth login` 配置凭证（部分步骤需用户在浏览器中配合授权；用户名密码登录时 Domain 默认 `guanbi`，也可留空自动探测）。目标 BI 环境：https://rsunbi.rsun.com:9521（guancli default profile），需向观远管理员申请两个数据集（合同台账明细、合同全周期应收明细）的访问权限。安装/登录命令涉及系统级操作，需用户明确确认后再执行。
-3. **已安装**：执行 `guancli auth status` 确认 PAT 有效；无效则重新 `guancli auth login`。
-4. 更新方式：重新执行安装命令即可。
+2. **已安装**：执行 `guancli auth status` 确认 PAT 有效；无效则重新 `guancli auth login`。
+3. **未安装或登录异常**：按 `references/environment-setup.md` 完成 guancli 安装与认证（目标 BI 环境 https://rsunbi.rsun.com:9521，default profile，需两个数据集的访问权限；安装/登录涉及系统级操作，需用户明确确认后再执行）。
 
 ### 第 1 步：确认基准日（必填）
 
@@ -175,7 +168,7 @@ guancli ds preview k3a8a2772ee4143d694a2ecd \
 - **每批命令参数固定**：`--filter "合同号 IN <本批合同号>" --columns <17 列清单> --sort-asc 合同号 --limit 10000 -f json`，落盘 `/tmp/receivable_batches_<基准日>/b_*.json`。
 - **截断防护**：单批返回行数达到 limit（10000）视为可能截断，必须拆小批次重取（先试 25 个/批，仍截断继续减半），直至返回行数 < limit。
 - **完整性门槛**：应得批次数 = ⌈合同号数 ÷ 50⌉；全部批次落盘且各批 JSON 可解析后，核对批次 JSON 数量与汇总行数，**校验通过才能进入第 2 步**，禁止部分批次缺失时继续执行。
-- 实测经验值（弘阳家居南京江北店 2026-08-31）：689 个合同号 → 14 批 → 21,613 行，单批最大约 4,200 行。
+- 实测经验值（689 合同号 → 14 批 → 21,613 行，单批最大约 4,200 行）见 `references/dataset-and-rules.md`。
 
 ```bash
 # 提取合同号并分批
@@ -206,11 +199,7 @@ done
   --snapshot-time "<ds get --brief 查到的更新时间>"
 ```
 
-输出 1（应收明细临时表，单 sheet 纯明细 31 列）：
-
-- 合同标识 4 列（门店名称/合同号/铺位号/租户名称）+ 合同属性 12 列（区域/楼栋/品牌/业态/主品类/楼层/计租面积/起租日/到期日/铺位类型/合同状态/是否续签，按合同号取自合并清单，区域/楼栋为台账字段随清单引入）+ 账单标识 2 列（应收编号/账单主键）+ 费项 3 列（费用名/费用类型/税率）+ 时间周期 3 列（费用开始日/费用截止日/应收日）+ 含税金额 5 列（应收金额/优惠金额/优惠后应收金额/已收金额/未收金额）。
-- 不含税计算 2 列：**不含税应收金额 = 应收金额/(1+税率)**、**不含税优惠后应收金额 = 优惠后应收金额/(1+税率)**（税率缺失时留空，保留 2 位小数）。
-- 脚本按账单主键去重（无主键行按 应收编号+费用名+费用起止日 兜底）并过滤到清单合同号；按合同号/费用类型/费用开始日排序。
+输出 1（应收明细临时表，单 sheet 纯明细 31 列）= 合同标识 4 + 合同属性 12（按合同号取自合并清单，区域/楼栋为台账字段随清单引入）+ 账单标识 2 + 费项 3 + 时间周期 3 + 含税金额 5 + 不含税计算 2（**不含税应收金额 = 应收金额/(1+税率)**、**不含税优惠后应收金额 = 优惠后应收金额/(1+税率)**，税率缺失留空，2 位小数）。完整列清单见 `references/dataset-and-rules.md` 及脚本 `DETAIL_COLS`；脚本按账单主键去重（无主键行按 应收编号+费用名+费用起止日 兜底）并过滤到清单合同号，按合同号/费用类型/费用开始日排序。
 
 输出 2（合并清单 34 列）= 30 列 + `最后账期费用开始日` + `最后账期费用截止日` + `支付周期` + `提前收款天数`：
 
@@ -254,7 +243,8 @@ done
 ## 资源
 
 - **自包含说明**：本技能执行仅依赖本文件、`references/` 与 `scripts/`；脚本保存 xlsx 时会自动创建输出目录。目录中的 `PROJECT_MEMORY.md` 仅为开发者维护的项目记忆与变更记录（口径溯源用），**非运行依赖**，技能使用者无需阅读。
-- `references/dataset-and-rules.md`：数据集字段、口径验证记录、门店别名映射、环境限制。首次使用或口径被质疑时必读。
+- `references/environment-setup.md`：guancli 安装、认证登录、BI 环境与数据集权限申请（仅环境未就绪时阅读）。
+- `references/dataset-and-rules.md`：数据集字段、口径验证记录、门店别名映射、环境限制、应收明细 31 列完整清单。首次使用或口径被质疑时必读。
 - `scripts/make_report.py`：在执行/未执行合同临时表生成器（`--mode active/future`，28 列，含日单价计算 `calc_unit_prices`）。
 - `scripts/merge_contracts.py`：合并清单生成器（续签标记，30 列；`build_merged_rows()` 供其他脚本复用）。
 - `scripts/receivable_detail.py`：应收明细生成 + 合并清单收款周期升级（31 列明细 + 34 列合并清单）。

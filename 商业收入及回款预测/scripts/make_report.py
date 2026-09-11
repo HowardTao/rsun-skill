@@ -19,7 +19,9 @@
 无汇总页；作为后续收入/回款预测的中间基表，最终输出表另行提供。
 口径:
 - 在执行(active) = 起租日 <= 基准日 <= 到期日(日期窗口判定),含正铺+多经;合同状态仅展示。
-- 未执行(future) = 起租日 > 基准日(已签约尚未起租);合同状态仅展示。
+- 未执行(future) = 起租日 > 基准日 且 起租日 < 到期日(已签约尚未起租);合同状态仅展示。
+- --store 仅用于摘要打印,不参与数据写入;输出列的「门店名称」取自数据。
+  两者不一致时由 check_store() 打印警告(不中断),供调用方发现传错门店。
 """
 import argparse
 import json
@@ -91,6 +93,21 @@ def clean(v, col):
     return v
 
 
+def check_store(rows, store, label="数据"):
+    """一致性校验：`--store` 仅用于摘要打印，输出列的「门店名称」取自数据本身。
+
+    两者不一致时打印警告（**不中断执行**），避免摘要文案与 Excel 内容对不上：
+    例如用 A 店取数却传了 `--store B`，Excel 是对的但摘要会错标。
+    本函数被 merge_contracts / receivable_detail / renewal_receivable 复用。
+    """
+    names = sorted({str(r.get("门店名称") or "").strip() for r in rows} - {""})
+    if not names:
+        print(f"⚠️ 警告：{label}中未取到「门店名称」，无法与 --store 校验")
+    elif names != [str(store).strip()]:
+        print(f"⚠️ 警告：--store「{store}」与{label}实际门店不一致 —— {'、'.join(names)}")
+        print("          输出列的「门店名称」取自数据，以上述数据为准；--store 仅用于摘要打印")
+
+
 def calc_unit_prices(rows):
     """就地计算 6 个日单价列（元/㎡/天）：
     日单价 = 总应收/(到期日-起租日+1)/计租面积；日净单价 = 优惠后总应收/同口径。
@@ -155,6 +172,7 @@ def build(input_path, base_date_str, store, output, snapshot_time, pos_note, mod
             (kept if ok else dropped).append(r)
         data = kept
 
+    check_store(data, store, f"输入 JSON（模式 {mode}）")
     n = len(data)
     contracts = {str(r.get("合同号") or "").strip() for r in data if r.get("合同号")}
     area = sum(num(r.get("计租面积")) or 0 for r in data)
